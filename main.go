@@ -90,7 +90,7 @@ func getConfig() config {
 }
 
 func sendEmail(cfg config) error {
-	fmt.Println(cfg)
+	// fmt.Println(cfg)
 	msg := strings.NewReader("Hello from cy-smtp!\nThis is a test message.")
 
 	auth := sasl.NewPlainClient("", cfg.username, cfg.password)
