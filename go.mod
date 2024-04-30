@@ -1,4 +1,4 @@
-module cycloid.io/cy-smpt
+module cycloid.io/cy-smtp
 
 go 1.22.2
 

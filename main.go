@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"os"
@@ -14,6 +15,7 @@ import (
 
 const (
 	cfg      = "config-file"
+	skiptls  = "email-tls-skip-verify"
 	server   = "email-smtp-svr-addr"
 	username = "email-smtp-username"
 	password = "email-smtp-password"
@@ -26,13 +28,13 @@ var RootCmd = &cobra.Command{
 	Short: "Send an email using Cycloid config",
 	Long:  "Send an email using Cycloid config file in order to test different SMTP servers integration",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		//c := config.New(viper.GetViper())
-		viper.SetConfigFile(viper.GetString("cfg"))
+		viper.SetConfigFile(viper.GetString(cfg))
 		err := viper.ReadInConfig()
 		if err != nil {
 			return fmt.Errorf("error reading config file: %w", err)
 		}
 		cfg := getConfig()
+		fmt.Printf("CONFIG: %+v\n", cfg)
 		err = sendEmail(cfg)
 		if err != nil {
 			return err
@@ -59,6 +61,9 @@ func init() {
 	RootCmd.Flags().StringP(from, "f", "", "From email address to use for any sent email")
 	viper.BindPFlag(from, RootCmd.Flags().Lookup(from))
 
+	RootCmd.Flags().Bool(skiptls, true, "Skip client TLS certs verification")
+	viper.BindPFlag(from, RootCmd.Flags().Lookup(from))
+
 	RootCmd.Flags().StringP(to, "t", "", "send test email to this address")
 }
 
@@ -71,6 +76,7 @@ func main() {
 
 type config struct {
 	cfgFile  string
+	skiptls  bool
 	server   string
 	username string
 	password string
@@ -81,6 +87,7 @@ type config struct {
 func getConfig() config {
 	return config{
 		cfgFile:  viper.GetString(cfg),
+		skiptls:  viper.GetBool(skiptls),
 		server:   viper.GetString(server),
 		username: viper.GetString(username),
 		password: viper.GetString(password),
@@ -90,13 +97,23 @@ func getConfig() config {
 }
 
 func sendEmail(cfg config) error {
-	// fmt.Println(cfg)
 	msg := strings.NewReader("Hello from cy-smtp!\nThis is a test message.")
 
-	auth := sasl.NewPlainClient("", cfg.username, cfg.password)
-
 	log.Println("Sending test email ")
-	err := smtp.SendMail(cfg.server, auth, cfg.from, []string{cfg.to}, msg)
+	tlsCfg := &tls.Config{
+		InsecureSkipVerify: cfg.skiptls,
+	}
+	client, err := smtp.DialStartTLS(cfg.server, tlsCfg)
+	if err != nil {
+		return fmt.Errorf("error connecting to server: %w", err)
+	}
+	auth := sasl.NewPlainClient("", cfg.username, cfg.password)
+	if ok, _ := client.Extension("AUTH"); ok {
+		if err = client.Auth(auth); err != nil {
+			return fmt.Errorf("error authenticating to server: %w", err)
+		}
+	}
+	err = client.SendMail(cfg.from, []string{cfg.to}, msg)
 	if err != nil {
 		return fmt.Errorf("error sending email: %w", err)
 	}
