@@ -3,6 +3,6 @@ email-smtp-svr-addr: 127.0.0.1:1025
 email-smtp-username: admin
 email-smtp-password: admin
 email-addr-from: noreply@cycloid.io
-email-addr-return-path: "admin+ydbounce@cycloid.io"
+email-addr-return-path: "Cycloid Framework <noreply-staging@cycloid.io>"
 email-tls-skip-verify: true
 email-addr-to: test@email.com

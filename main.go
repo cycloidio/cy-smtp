@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"strings"
+	"time"
 
+	"github.com/emersion/go-message/mail"
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
 	"github.com/spf13/cobra"
@@ -14,7 +17,7 @@ import (
 )
 
 const (
-	cfg      = "config-file"
+	cfile    = "config-file"
 	skiptls  = "email-tls-skip-verify"
 	server   = "email-smtp-svr-addr"
 	username = "email-smtp-username"
@@ -24,7 +27,7 @@ const (
 )
 
 var (
-	cfgFlag      string
+	cfileFlag    string
 	skiptlsFlag  bool
 	serverFlag   string
 	usernameFlag string
@@ -38,7 +41,7 @@ var RootCmd = &cobra.Command{
 	Short: "Send an email using Cycloid config",
 	Long:  "Send an email using Cycloid config file in order to test different SMTP servers integration",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		viper.SetConfigFile(cfgFlag)
+		viper.SetConfigFile(cfileFlag)
 		err := viper.ReadInConfig()
 		if err != nil {
 			return fmt.Errorf("error reading config file: %w", err)
@@ -57,8 +60,8 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.Flags().StringVarP(&cfgFlag, cfg, "c", "config.yaml", "The configuration file PATH.")
-	viper.BindPFlag(cfg, RootCmd.Flags().Lookup(cfg))
+	RootCmd.Flags().StringVarP(&cfileFlag, cfile, "c", "config.yaml", "The configuration file PATH.")
+	viper.BindPFlag(cfile, RootCmd.Flags().Lookup(cfile))
 
 	RootCmd.Flags().StringVarP(&serverFlag, server, "s", "", "SMTP server address (host:port)")
 	viper.BindPFlag(server, RootCmd.Flags().Lookup(server))
@@ -97,7 +100,7 @@ type config struct {
 
 func getConfig() config {
 	ret := config{
-		cfgFile:  cfgFlag,
+		cfgFile:  cfileFlag,
 		skiptls:  skiptlsFlag,
 		server:   serverFlag,
 		username: usernameFlag,
@@ -106,7 +109,7 @@ func getConfig() config {
 		to:       toFlag,
 	}
 	if ret.cfgFile == "" {
-		ret.cfgFile = viper.GetString(cfg)
+		ret.cfgFile = viper.GetString(cfile)
 	}
 	if ret.skiptls == false {
 		ret.skiptls = viper.GetBool(skiptls)
@@ -130,9 +133,21 @@ func getConfig() config {
 }
 
 func sendEmail(cfg config) error {
-	msg := strings.NewReader("Hello from cy-smtp!\nThis is a test message.")
+	from, err := mail.ParseAddress(cfg.from)
+	if err != nil {
+		return fmt.Errorf("error sender address: %w", err)
+	}
+	to, err := mail.ParseAddress(cfg.to)
+	if err != nil {
+		return fmt.Errorf("error recipient address: %w", err)
+	}
 
-	log.Println("Sending test email ")
+	msg, err := formatEmail(from, to)
+	if err != nil {
+		return fmt.Errorf("error formatting email: %w", err)
+	}
+
+	log.Print("Sending test email... ")
 	tlsCfg := &tls.Config{
 		InsecureSkipVerify: cfg.skiptls,
 	}
@@ -146,9 +161,50 @@ func sendEmail(cfg config) error {
 			return fmt.Errorf("error authenticating to server: %w", err)
 		}
 	}
-	err = client.SendMail(cfg.from, []string{cfg.to}, msg)
+	err = client.SendMail(from.Address, []string{to.Address}, &msg)
 	if err != nil {
 		return fmt.Errorf("error sending email: %w", err)
 	}
+	log.Println("Email sent!")
+
 	return nil
+}
+
+func formatEmail(fromAddrs, toAddrs *mail.Address) (bytes.Buffer, error) {
+	var b bytes.Buffer
+
+	from := []*mail.Address{fromAddrs}
+	to := []*mail.Address{toAddrs}
+
+	// Create our mail header
+	var h mail.Header
+	h.SetDate(time.Now())
+	h.SetAddressList("From", from)
+	h.SetAddressList("To", to)
+
+	// Create a new mail writer
+	mw, err := mail.CreateWriter(&b, h)
+	if err != nil {
+		return b, fmt.Errorf("error creating email writer: %w", err)
+	}
+
+	// Create a text part
+	tw, err := mw.CreateInline()
+	if err != nil {
+		return b, fmt.Errorf("error creating email InlineWriter: %w", err)
+	}
+	var th mail.InlineHeader
+	th.Set("Content-Type", "text/plain")
+	w, err := tw.CreatePart(th)
+	if err != nil {
+		log.Fatal(err)
+	}
+	io.WriteString(w, "Hello from cy-smtp!\nThis is a test message.")
+	w.Close()
+	tw.Close()
+
+	mw.Close()
+
+	return b, nil
+
 }
