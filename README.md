@@ -22,6 +22,6 @@ tar xf cy-smtp-v*-linux-amd64.tar.gz
 export SMTP_TO=your@email.com
 
 export SMTP_FROM=$(grep email-addr-from config.yml | sed 's@"@@g;s@<@@g;s@>@@g' | sed -E 's/.* ([^ ]+@[^ ]+)/\1/')
-./cy-smtp --config-file /opt/config.yml -f $SMTP_FROM  -t $SMTP_RETURN
+./cy-smtp --config-file /opt/config.yml -f $SMTP_FROM  -t $SMTP_TO
 
 ```
