@@ -23,11 +23,21 @@ const (
 	to       = "email-addr-to"
 )
 
+var (
+	cfgFlag      string
+	skiptlsFlag  bool
+	serverFlag   string
+	usernameFlag string
+	passwordFlag string
+	fromFlag     string
+	toFlag       string
+)
+
 var RootCmd = &cobra.Command{
 	Use:   "cy-smtp",
 	Short: "Send an email using Cycloid config",
 	Long:  "Send an email using Cycloid config file in order to test different SMTP servers integration",
-	RunE: func(_ *cobra.Command, _ []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		viper.SetConfigFile(viper.GetString(cfg))
 		err := viper.ReadInConfig()
 		if err != nil {
@@ -46,25 +56,25 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.Flags().StringP(cfg, "c", "config.yaml", "The configuration file PATH.")
+	RootCmd.Flags().StringVarP(&cfgFlag, cfg, "c", "config.yaml", "The configuration file PATH.")
 	viper.BindPFlag(cfg, RootCmd.Flags().Lookup(cfg))
 
-	RootCmd.Flags().StringP(server, "s", "", "SMTP server address (host:port)")
+	RootCmd.Flags().StringVarP(&serverFlag, server, "s", "", "SMTP server address (host:port)")
 	viper.BindPFlag(server, RootCmd.Flags().Lookup(server))
 
-	RootCmd.Flags().StringP(username, "u", "", "Username for authenticating the connections to the SMTP server")
+	RootCmd.Flags().StringVarP(&usernameFlag, username, "u", "", "Username for authenticating the connections to the SMTP server")
 	viper.BindPFlag(username, RootCmd.Flags().Lookup(username))
 
-	RootCmd.Flags().StringP(password, "p", "", "Password for authenticating the connections to the SMTP server")
+	RootCmd.Flags().StringVarP(&passwordFlag, password, "p", "", "Password for authenticating the connections to the SMTP server")
 	viper.BindPFlag(password, RootCmd.Flags().Lookup(password))
 
-	RootCmd.Flags().StringP(from, "f", "", "From email address to use for any sent email")
+	RootCmd.Flags().StringVarP(&fromFlag, from, "f", "", "From email address to use for any sent email")
 	viper.BindPFlag(from, RootCmd.Flags().Lookup(from))
 
-	RootCmd.Flags().Bool(skiptls, true, "Skip client TLS certs verification")
+	RootCmd.Flags().BoolVar(&skiptlsFlag, skiptls, true, "Skip client TLS certs verification")
 	viper.BindPFlag(from, RootCmd.Flags().Lookup(from))
 
-	RootCmd.Flags().StringP(to, "t", "", "send test email to this address")
+	RootCmd.Flags().StringVarP(&toFlag, to, "t", "", "send test email to this address")
 }
 
 func main() {
@@ -86,13 +96,13 @@ type config struct {
 
 func getConfig() config {
 	return config{
-		cfgFile:  viper.GetString(cfg),
-		skiptls:  viper.GetBool(skiptls),
-		server:   viper.GetString(server),
-		username: viper.GetString(username),
-		password: viper.GetString(password),
-		from:     viper.GetString(from),
-		to:       viper.GetString(to),
+		cfgFile:  cfgFlag,
+		skiptls:  skiptlsFlag,
+		server:   serverFlag,
+		username: usernameFlag,
+		password: passwordFlag,
+		from:     fromFlag,
+		to:       toFlag,
 	}
 }
 
