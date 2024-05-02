@@ -38,11 +38,12 @@ var RootCmd = &cobra.Command{
 	Short: "Send an email using Cycloid config",
 	Long:  "Send an email using Cycloid config file in order to test different SMTP servers integration",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		viper.SetConfigFile(viper.GetString(cfg))
+		viper.SetConfigFile(cfgFlag)
 		err := viper.ReadInConfig()
 		if err != nil {
 			return fmt.Errorf("error reading config file: %w", err)
 		}
+		fmt.Printf("viper: %+v\n", viper.GetString(server))
 		cfg := getConfig()
 		fmt.Printf("CONFIG: %+v\n", cfg)
 		err = sendEmail(cfg)
@@ -95,7 +96,7 @@ type config struct {
 }
 
 func getConfig() config {
-	return config{
+	ret := config{
 		cfgFile:  cfgFlag,
 		skiptls:  skiptlsFlag,
 		server:   serverFlag,
@@ -104,6 +105,28 @@ func getConfig() config {
 		from:     fromFlag,
 		to:       toFlag,
 	}
+	if ret.cfgFile == "" {
+		ret.cfgFile = viper.GetString(cfg)
+	}
+	if ret.skiptls == false {
+		ret.skiptls = viper.GetBool(skiptls)
+	}
+	if ret.server == "" {
+		ret.server = viper.GetString(server)
+	}
+	if ret.username == "" {
+		ret.username = viper.GetString(username)
+	}
+	if ret.password == "" {
+		ret.password = viper.GetString(password)
+	}
+	if ret.from == "" {
+		ret.from = viper.GetString(from)
+	}
+	if ret.to == "" {
+		ret.to = viper.GetString(to)
+	}
+	return ret
 }
 
 func sendEmail(cfg config) error {
