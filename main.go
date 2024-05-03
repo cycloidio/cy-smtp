@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"time"
 
@@ -147,25 +146,38 @@ func sendEmail(cfg config) error {
 		return fmt.Errorf("error formatting email: %w", err)
 	}
 
-	log.Print("Sending test email... ")
 	tlsCfg := &tls.Config{
 		InsecureSkipVerify: cfg.skiptls,
 	}
+	fmt.Print("STARTTLS... ")
 	client, err := smtp.DialStartTLS(cfg.server, tlsCfg)
 	if err != nil {
 		return fmt.Errorf("error connecting to server: %w", err)
 	}
-	auth := sasl.NewPlainClient("", cfg.username, cfg.password)
-	if ok, _ := client.Extension("AUTH"); ok {
-		if err = client.Auth(auth); err != nil {
-			return fmt.Errorf("error authenticating to server: %w", err)
+	fmt.Println("done!")
+	if ok, authExt := client.Extension("AUTH"); ok {
+		fmt.Printf("AUTH: %s... ", authExt)
+		var auth sasl.Client
+		switch authExt {
+		case sasl.Plain:
+			auth = sasl.NewPlainClient("", cfg.username, cfg.password)
+			if err = client.Auth(auth); err != nil {
+				return fmt.Errorf("error authenticating to server: %w", err)
+			}
+		case sasl.Login:
+			auth = sasl.NewLoginClient(cfg.username, cfg.password)
+			if err = client.Auth(auth); err != nil {
+				return fmt.Errorf("error authenticating to server: %w", err)
+			}
 		}
+		fmt.Println("done!")
 	}
+	fmt.Print("Sending test email... ")
 	err = client.SendMail(from.Address, []string{to.Address}, &msg)
 	if err != nil {
 		return fmt.Errorf("error sending email: %w", err)
 	}
-	log.Println("Email sent!")
+	fmt.Println("done!")
 
 	return nil
 }
@@ -197,7 +209,7 @@ func formatEmail(fromAddrs, toAddrs *mail.Address) (bytes.Buffer, error) {
 	th.Set("Content-Type", "text/plain")
 	w, err := tw.CreatePart(th)
 	if err != nil {
-		log.Fatal(err)
+		return b, fmt.Errorf("error creating email part: %w", err)
 	}
 	io.WriteString(w, "Hello from cy-smtp!\nThis is a test message.")
 	w.Close()
