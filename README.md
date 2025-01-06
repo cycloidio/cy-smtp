@@ -16,7 +16,8 @@ There are two addition: `email-tls-skip-verify` and `email-addr-to`. If you are 
 ## Quick start
 
 ```
-wget https://github.com/cycloidio/cy-smtp/releases/download/v0.3.1/cy-smtp-v0.3.1-linux-amd64.tar.gz
+LATEST_RELEASE=$(curl -s https://api.github.com/repos/cycloidio/cy-smtp/releases/latest | jq -r '.tag_name')
+wget https://github.com/cycloidio/cy-smtp/releases/download/$LATEST_RELEASE/cy-smtp-$LATEST_RELEASE-linux-amd64.tar.gz
 tar xf cy-smtp-v*-linux-amd64.tar.gz
 
 export SMTP_TO=your@email.com
